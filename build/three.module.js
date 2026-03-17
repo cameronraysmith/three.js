@@ -377,7 +377,7 @@ var fog_pars_fragment = "#ifdef USE_FOG\n\tuniform vec3 fogColor;\n\tvarying flo
 
 var gradientmap_pars_fragment = "#ifdef USE_GRADIENTMAP\n\tuniform sampler2D gradientMap;\n#endif\nvec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ) {\n\tfloat dotNL = dot( normal, lightDirection );\n\tvec2 coord = vec2( dotNL * 0.5 + 0.5, 0.0 );\n\t#ifdef USE_GRADIENTMAP\n\t\treturn vec3( texture2D( gradientMap, coord ).r );\n\t#else\n\t\tvec2 fw = fwidth( coord ) * 0.5;\n\t\treturn mix( vec3( 0.7 ), vec3( 1.0 ), smoothstep( 0.7 - fw.x, 0.7 + fw.x, coord.x ) );\n\t#endif\n}";
 
-var light_probe_volume_pars_fragment = "#ifdef USE_LIGHT_PROBE_VOLUME\nuniform highp sampler3D probeGridSH0;\nuniform highp sampler3D probeGridSH1;\nuniform highp sampler3D probeGridSH2;\nuniform highp sampler3D probeGridSH3;\nuniform highp sampler3D probeGridSH4;\nuniform highp sampler3D probeGridSH5;\nuniform highp sampler3D probeGridSH6;\nuniform vec3 probeGridMin;\nuniform vec3 probeGridMax;\nvec3 getLightProbeVolumeIrradiance( vec3 worldPos, vec3 worldNormal ) {\n\tvec3 texSize = vec3( textureSize( probeGridSH0, 0 ) );\n\tvec3 texSizeMinusOne = texSize - 1.0;\n\tvec3 gridRange = probeGridMax - probeGridMin;\n\tvec3 probeSpacing = gridRange / texSizeMinusOne;\n\tvec3 samplePos = worldPos + worldNormal * probeSpacing * 0.5;\n\tvec3 uvw = clamp( ( samplePos - probeGridMin ) / gridRange, 0.0, 1.0 );\n\tuvw = uvw * texSizeMinusOne / texSize + 0.5 / texSize;\n\tvec4 s0 = texture( probeGridSH0, uvw );\n\tvec4 s1 = texture( probeGridSH1, uvw );\n\tvec4 s2 = texture( probeGridSH2, uvw );\n\tvec4 s3 = texture( probeGridSH3, uvw );\n\tvec4 s4 = texture( probeGridSH4, uvw );\n\tvec4 s5 = texture( probeGridSH5, uvw );\n\tvec4 s6 = texture( probeGridSH6, uvw );\n\tvec3 c0 = s0.xyz;\n\tvec3 c1 = vec3( s0.w, s1.xy );\n\tvec3 c2 = vec3( s1.zw, s2.x );\n\tvec3 c3 = s2.yzw;\n\tvec3 c4 = s3.xyz;\n\tvec3 c5 = vec3( s3.w, s4.xy );\n\tvec3 c6 = vec3( s4.zw, s5.x );\n\tvec3 c7 = s5.yzw;\n\tvec3 c8 = s6.xyz;\n\tfloat x = worldNormal.x, y = worldNormal.y, z = worldNormal.z;\n\tvec3 result = c0 * 0.886227;\n\tresult += c1 * 2.0 * 0.511664 * y;\n\tresult += c2 * 2.0 * 0.511664 * z;\n\tresult += c3 * 2.0 * 0.511664 * x;\n\tresult += c4 * 2.0 * 0.429043 * x * y;\n\tresult += c5 * 2.0 * 0.429043 * y * z;\n\tresult += c6 * ( 0.743125 * z * z - 0.247708 );\n\tresult += c7 * 2.0 * 0.429043 * x * z;\n\tresult += c8 * 0.429043 * ( x * x - y * y );\n\treturn max( result, vec3( 0.0 ) );\n}\n#endif";
+var light_probe_volume_pars_fragment = "#ifdef USE_LIGHT_PROBE_VOLUME\nuniform highp sampler3D probeGridSH;\nuniform vec3 probeGridMin;\nuniform vec3 probeGridMax;\nuniform vec3 probeGridResolution;\nvec3 getLightProbeVolumeIrradiance( vec3 worldPos, vec3 worldNormal ) {\n\tvec3 res = probeGridResolution;\n\tvec3 gridRange = probeGridMax - probeGridMin;\n\tvec3 resMinusOne = res - 1.0;\n\tvec3 probeSpacing = gridRange / resMinusOne;\n\tvec3 samplePos = worldPos + worldNormal * probeSpacing * 0.5;\n\tvec3 uvw = clamp( ( samplePos - probeGridMin ) / gridRange, 0.0, 1.0 );\n\tuvw = uvw * resMinusOne / res + 0.5 / res;\n\tfloat nz          = res.z;\n\tfloat paddedSlices = nz + 2.0;\n\tfloat atlasDepth  = 7.0 * paddedSlices;\n\tfloat uvZBase     = uvw.z * nz + 1.0;\n\tvec4 s0 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase                       ) / atlasDepth ) );\n\tvec4 s1 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase +       paddedSlices   ) / atlasDepth ) );\n\tvec4 s2 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase + 2.0 * paddedSlices   ) / atlasDepth ) );\n\tvec4 s3 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase + 3.0 * paddedSlices   ) / atlasDepth ) );\n\tvec4 s4 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase + 4.0 * paddedSlices   ) / atlasDepth ) );\n\tvec4 s5 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase + 5.0 * paddedSlices   ) / atlasDepth ) );\n\tvec4 s6 = texture( probeGridSH, vec3( uvw.xy, ( uvZBase + 6.0 * paddedSlices   ) / atlasDepth ) );\n\tvec3 c0 = s0.xyz;\n\tvec3 c1 = vec3( s0.w, s1.xy );\n\tvec3 c2 = vec3( s1.zw, s2.x );\n\tvec3 c3 = s2.yzw;\n\tvec3 c4 = s3.xyz;\n\tvec3 c5 = vec3( s3.w, s4.xy );\n\tvec3 c6 = vec3( s4.zw, s5.x );\n\tvec3 c7 = s5.yzw;\n\tvec3 c8 = s6.xyz;\n\tfloat x = worldNormal.x, y = worldNormal.y, z = worldNormal.z;\n\tvec3 result = c0 * 0.886227;\n\tresult += c1 * 2.0 * 0.511664 * y;\n\tresult += c2 * 2.0 * 0.511664 * z;\n\tresult += c3 * 2.0 * 0.511664 * x;\n\tresult += c4 * 2.0 * 0.429043 * x * y;\n\tresult += c5 * 2.0 * 0.429043 * y * z;\n\tresult += c6 * ( 0.743125 * z * z - 0.247708 );\n\tresult += c7 * 2.0 * 0.429043 * x * z;\n\tresult += c8 * 0.429043 * ( x * x - y * y );\n\treturn max( result, vec3( 0.0 ) );\n}\n#endif";
 
 var lightmap_pars_fragment = "#ifdef USE_LIGHTMAP\n\tuniform sampler2D lightMap;\n\tuniform float lightMapIntensity;\n#endif";
 
@@ -914,15 +914,10 @@ const UniformsLib = {
 		ltc_1: { value: null },
 		ltc_2: { value: null },
 
-		probeGridSH0: { value: null },
-		probeGridSH1: { value: null },
-		probeGridSH2: { value: null },
-		probeGridSH3: { value: null },
-		probeGridSH4: { value: null },
-		probeGridSH5: { value: null },
-		probeGridSH6: { value: null },
+		probeGridSH: { value: null },
 		probeGridMin: { value: /*@__PURE__*/ new Vector3() },
-		probeGridMax: { value: /*@__PURE__*/ new Vector3() }
+		probeGridMax: { value: /*@__PURE__*/ new Vector3() },
+		probeGridResolution: { value: /*@__PURE__*/ new Vector3() }
 
 	},
 
@@ -15888,32 +15883,6 @@ function getDFGLUT() {
 
 }
 
-const _objectPosition = /*@__PURE__*/ new Vector3();
-
-function findLightProbeVolume( volumes, object ) {
-
-	if ( volumes.length === 0 ) return null;
-
-	if ( volumes.length === 1 ) {
-
-		return volumes[ 0 ].textures[ 0 ] !== null ? volumes[ 0 ] : null;
-
-	}
-
-	_objectPosition.setFromMatrixPosition( object.matrixWorld );
-
-	for ( let i = 0, l = volumes.length; i < l; i ++ ) {
-
-		const v = volumes[ i ];
-
-		if ( v.textures[ 0 ] !== null && v.boundingBox.containsPoint( _objectPosition ) ) return v;
-
-	}
-
-	return null;
-
-}
-
 /**
  * This renderer uses WebGL 2 to display scenes.
  *
@@ -15989,6 +15958,7 @@ class WebGLRenderer {
 
 		const uintClearColor = new Uint32Array( 4 );
 		const intClearColor = new Int32Array( 4 );
+		const objectPosition = new Vector3();
 
 		let currentRenderList = null;
 		let currentRenderState = null;
@@ -18128,6 +18098,30 @@ class WebGLRenderer {
 
 		}
 
+		function findLightProbeVolume( volumes, object ) {
+
+			if ( volumes.length === 0 ) return null;
+
+			if ( volumes.length === 1 ) {
+
+				return volumes[ 0 ].texture !== null ? volumes[ 0 ] : null;
+
+			}
+
+			objectPosition.setFromMatrixPosition( object.matrixWorld );
+
+			for ( let i = 0, l = volumes.length; i < l; i ++ ) {
+
+				const v = volumes[ i ];
+
+				if ( v.texture !== null && v.boundingBox.containsPoint( objectPosition ) ) return v;
+
+			}
+
+			return null;
+
+		}
+
 		function setProgram( camera, scene, geometry, material, object ) {
 
 			if ( scene.isScene !== true ) scene = _emptyScene; // scene could be a Mesh, Line, Points, ...
@@ -18334,9 +18328,9 @@ class WebGLRenderer {
 
 				const objectVolume = findLightProbeVolume( currentRenderState.state.lightProbeVolumesArray, object );
 
-				if ( materialProperties.__lightProbeVolume !== objectVolume ) {
+				if ( materialProperties.lightProbeVolume !== objectVolume ) {
 
-					materialProperties.__lightProbeVolume = objectVolume;
+					materialProperties.lightProbeVolume = objectVolume;
 					refreshMaterial = true;
 
 				}
@@ -18522,21 +18516,16 @@ class WebGLRenderer {
 
 				materials.refreshMaterialUniforms( m_uniforms, material, _pixelRatio, _height, currentRenderState.state.transmissionRenderTarget[ camera.id ] );
 
-				// irradiance probe grid
+				// light probe volume
 
-				if ( materialProperties.needsLights && materialProperties.__lightProbeVolume ) {
+				if ( materialProperties.needsLights && materialProperties.lightProbeVolume ) {
 
-					const volume = materialProperties.__lightProbeVolume;
+					const volume = materialProperties.lightProbeVolume;
 
-					m_uniforms.probeGridSH0.value = volume.textures[ 0 ];
-					m_uniforms.probeGridSH1.value = volume.textures[ 1 ];
-					m_uniforms.probeGridSH2.value = volume.textures[ 2 ];
-					m_uniforms.probeGridSH3.value = volume.textures[ 3 ];
-					m_uniforms.probeGridSH4.value = volume.textures[ 4 ];
-					m_uniforms.probeGridSH5.value = volume.textures[ 5 ];
-					m_uniforms.probeGridSH6.value = volume.textures[ 6 ];
+					m_uniforms.probeGridSH.value = volume.texture;
 					m_uniforms.probeGridMin.value.copy( volume.boundingBox.min );
 					m_uniforms.probeGridMax.value.copy( volume.boundingBox.max );
+					m_uniforms.probeGridResolution.value.copy( volume.resolution );
 
 				}
 
